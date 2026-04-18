@@ -1,0 +1,207 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leilão Center Jeans</title>
+    <meta property="og:title" content="Leilão Center Jeans">
+    <meta property="og:image" content="https://i.postimg.cc/0NJsLKWm/FB-IMG-1776484580426.jpg">
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Crimson+Text:wght@400;600&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0a0a0f; color: #e8e0d0; font-family: 'Crimson Text', serif; padding-bottom: 50px; }
+        .gold { color: #d4af37; }
+        header { padding: 1rem; border-bottom: 1px solid rgba(212,175,55,0.2); display: flex; justify-content: space-between; align-items: center; background: #000; position: sticky; top: 0; z-index: 100; }
+        .container { padding: 1rem; max-width: 500px; margin: auto; }
+        .card { background: rgba(255,255,255,.03); border: 1px solid rgba(212,175,55,.15); padding: 1rem; margin-bottom: 1rem; border-radius: 8px; position: relative; overflow: hidden; }
+        .carousel-wrapper { position: relative; width: 100%; background: #000; }
+        .img-container { width: 100%; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; }
+        .img-container::-webkit-scrollbar { display: none; }
+        .img-box { min-width: 100%; scroll-snap-align: start; height: 350px; display: flex; align-items: center; justify-content: center; }
+        .img-box img { width: 100%; height: 100%; object-fit: contain; }
+        .btn-gold { background: linear-gradient(135deg,#d4af37,#aa8a2e); color: #0a0a0f; border: none; padding: .9rem; cursor: pointer; font-weight: bold; width: 100%; text-transform: uppercase; border-radius: 4px; margin-top: 10px; }
+        .status-badge { position: absolute; top: 10px; right: 10px; padding: 4px 8px; border-radius: 4px; font-size: 0.65rem; font-weight: bold; text-transform: uppercase; z-index: 5; }
+        .bg-active { background: #1b4d3e; color: #50c878; border: 1px solid #50c878; }
+        .bg-closed { background: #4d1b1b; color: #ff5555; border: 1px solid #ff5555; }
+        input { background: rgba(255,255,255,.05); border: 1px solid rgba(212,175,55,.3); color: #fff; padding: .8rem; width: 100%; margin-bottom: 10px; border-radius: 4px; font-size: 16px; outline: none; }
+        .hidden { display: none; }
+        .admin-controls { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; padding: 10px; }
+        .admin-controls button { flex: 1; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer; font-weight: bold; font-size: 0.7rem; }
+        .history-box { margin-top: 20px; border-top: 1px solid rgba(212,175,55,0.2); padding-top: 15px; }
+        .history-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
+        .wa-link { color: #50c878; text-decoration: none; font-weight: bold; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <h2 class="gold" onclick="location.reload()" style="cursor:pointer; font-family: 'Playfair Display';">CENTER JEANS</h2>
+        <button id="btnAdmin" style="color:#d4af37; background:none; border:1px solid #d4af37; padding:5px 10px; border-radius:4px; font-size: 12px;">PAINEL</button>
+    </header>
+
+    <div id="homeView" class="container">
+        <div id="listaLeiloes"></div>
+    </div>
+
+    <div id="itemView" class="container hidden">
+        <button onclick="showHome()" style="color:#d4af37; background:none; border:none; margin-bottom:1rem; cursor:pointer; font-weight: bold;">← VOLTAR</button>
+        <div id="detalheItem"></div>
+    </div>
+
+    <div id="adminView" class="container hidden">
+        <h3 class="gold" style="text-align: center; margin-bottom: 10px;">ADMINISTRAÇÃO</h3>
+        <div class="card" style="padding: 15px; border-style: dashed;">
+            <input id="f_title" placeholder="Nome do Produto">
+            <input id="f_price" type="number" placeholder="Preço Inicial">
+            <input id="f_img" placeholder="Links das Fotos (separados por vírgula)">
+            <button class="btn-gold" onclick="saveLote()">Publicar Lote</button>
+        </div>
+        <div id="listaAdmin"></div>
+        <button class="btn-gold" style="background:none; border:1px solid red; color:red; margin-top:20px;" onclick="limparTudo()">APAGAR TUDO</button>
+        <button class="btn-gold" style="background:none; color:#fff; border:1px solid #333; margin-top:10px;" onclick="showHome()">Sair</button>
+    </div>
+
+    <script>
+        const SENHA_ADMIN = "center2026";
+        const firebaseConfig = {
+            apiKey: "AIzaSyCk7R72T14wFUTLxmDOBSBPfTKm6ImPXBM",
+            authDomain: "leilaocenterjeans-2026.firebaseapp.com",
+            databaseURL: "https://leilaocenterjeans-2026-default-rtdb.firebaseio.com",
+            projectId: "leilaocenterjeans-2026",
+            storageBucket: "leilaocenterjeans-2026.firebasestorage.app",
+            messagingSenderId: "416271766172",
+            appId: "1:416271766172:web:555401cce1f47b93121359"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        let currentItemRef = null;
+
+        function showHome() {
+            if(currentItemRef) { currentItemRef.off(); currentItemRef = null; }
+            document.getElementById('homeView').classList.remove('hidden');
+            document.getElementById('itemView').classList.add('hidden');
+            document.getElementById('adminView').classList.add('hidden');
+        }
+
+        document.getElementById('btnAdmin').onclick = () => {
+            if(prompt("Senha:") === SENHA_ADMIN) {
+                document.getElementById('homeView').classList.add('hidden');
+                document.getElementById('adminView').classList.remove('hidden');
+            }
+        };
+
+        function renderImgs(imgStr) {
+            if(!imgStr) return '<div class="img-box"><img src="https://placehold.co/400x600/1a1a1a/d4af37?text=Sem+Foto"></div>';
+            const links = imgStr.split(',').map(l => l.trim()).filter(l => l !== "");
+            let html = '<div class="carousel-wrapper"><div class="img-container">';
+            links.forEach(link => { html += `<div class="img-box"><img src="${link}"></div>`; });
+            html += '</div></div>';
+            return html;
+        }
+
+        function saveLote() {
+            const title = document.getElementById('f_title').value;
+            const price = parseFloat(document.getElementById('f_price').value);
+            const img = document.getElementById('f_img').value;
+            if(!title || isNaN(price)) return alert("Preencha título e preço!");
+            const id = Date.now();
+            db.ref("leiloes/" + id).set({ title, currentPrice: price, img, status: 'pending', lastBidder: 'Ninguém', lastBidderPhone: '' });
+            alert("Lote criado!");
+        }
+
+        function openItem(id) {
+            if(currentItemRef) currentItemRef.off();
+            currentItemRef = db.ref(`leiloes/${id}`);
+            currentItemRef.on('value', (snap) => {
+                const item = snap.val();
+                if(!item) return showHome();
+                document.getElementById('homeView').classList.add('hidden');
+                document.getElementById('itemView').classList.remove('hidden');
+                
+                let htmlLance = item.status === 'active' ? `
+                    <div style="margin-top:15px">
+                        <input id="u_nome" placeholder="Seu Nome Completo">
+                        <input id="u_telefone" type="tel" placeholder="WhatsApp (ex: 66999999999)">
+                        <input id="u_valor" type="number" value="${item.currentPrice + 5}">
+                        <button class="btn-gold" onclick="enviarLance('${id}', ${item.currentPrice})">Confirmar Lance</button>
+                    </div>
+                ` : `<div style="text-align:center; padding:15px; color:#ff5555; border:1px solid #ff5555; border-radius:4px; margin-top:10px;">LEILÃO ENCERRADO</div>`;
+
+                let htmlHist = "";
+                if(item.historico) {
+                    const bids = Object.values(item.historico).reverse();
+                    htmlHist = `<div class="history-box"><p class="gold" style="font-size:0.8rem; margin-bottom:10px;">ÚLTIMOS LANCES:</p>` + 
+                    bids.slice(0,5).map(b => `<div class="history-item"><span>${b.nome}</span><span class="gold">R$ ${b.valor}</span></div>`).join('') + `</div>`;
+                }
+
+                document.getElementById('detalheItem').innerHTML = `
+                    <div class="card">
+                        <span class="status-badge bg-${item.status}">${item.status === 'active' ? 'Ao Vivo' : 'Encerrado'}</span>
+                        ${renderImgs(item.img)}
+                        <div style="padding: 15px;">
+                            <h2 style="font-family: 'Playfair Display'; margin-bottom: 15px;">${item.title}</h2>
+                            <div style="background:rgba(212,175,55,0.1); padding:1rem; border-radius:8px; text-align:center; margin-bottom:20px; border:1px dashed #d4af37;">
+                                <p style="font-size:0.8rem; opacity: 0.8;">VALOR ATUAL</p>
+                                <h1 class="gold" style="font-size:2.8rem; margin: 5px 0;">R$ ${item.currentPrice}</h1>
+                                <p style="font-size: 0.9rem;">Líder: <strong>${item.lastBidder}</strong></p>
+                            </div>
+                            ${htmlLance}
+                            ${htmlHist}
+                        </div>
+                    </div>`;
+            });
+        }
+
+        function enviarLance(id, precoAtual) {
+            const nome = document.getElementById('u_nome').value.trim();
+            const tel = document.getElementById('u_telefone').value.trim();
+            const lance = parseFloat(document.getElementById('u_valor').value);
+
+            if(!nome) return alert("Por favor, digite seu NOME!");
+            if(!tel) return alert("Por favor, digite seu WHATSAPP!");
+            if(isNaN(lance) || lance <= precoAtual) return alert("O lance deve ser MAIOR que R$ " + precoAtual);
+            
+            db.ref(`leiloes/${id}`).update({ currentPrice: lance, lastBidder: nome, lastBidderPhone: tel });
+            db.ref(`leiloes/${id}/historico`).push({ nome, valor: lance });
+            alert("Sucesso! Você é o novo líder.");
+        }
+
+        db.ref("leiloes").on("value", (snap) => {
+            const data = snap.val() || {};
+            const listaVitrine = document.getElementById('listaLeiloes');
+            const listaAdmin = document.getElementById('listaAdmin');
+            listaVitrine.innerHTML = ""; listaAdmin.innerHTML = "";
+
+            Object.keys(data).sort((a,b) => b-a).forEach(id => {
+                const item = data[id];
+                listaVitrine.innerHTML += `
+                    <div class="card" onclick="openItem('${id}')">
+                        <span class="status-badge bg-${item.status}">${item.status === 'active' ? 'Ao Vivo' : 'Breve'}</span>
+                        ${renderImgs(item.img)}
+                        <div style="padding: 15px"><h3 class="gold">${item.title}</h3><p style="font-size:1.3rem; font-weight:bold;">R$ ${item.currentPrice}</p></div>
+                    </div>`;
+
+                let wa = item.lastBidderPhone ? `<a href="https://wa.me/55${item.lastBidderPhone.replace(/\D/g,'')}" target="_blank" class="wa-link">📱 WhatsApp Cliente</a>` : 'Sem contato';
+                listaAdmin.innerHTML += `
+                    <div class="card" style="padding: 10px;">
+                        <strong>${item.title}</strong> | <span class="gold">R$ ${item.currentPrice}</span><br>
+                        <small>Líder: ${item.lastBidder}</small> | ${wa}
+                        <div class="admin-controls">
+                            <button onclick="setStatus('${id}','active')" style="background:#1b4d3e">ABRIR</button>
+                            <button onclick="setStatus('${id}','closed')" style="background:#4d1b1b">FECHAR</button>
+                            <button onclick="deleteItem('${id}')" style="background:#333">EXCLUIR</button>
+                        </div>
+                    </div>`;
+            });
+        });
+
+        function setStatus(id, s) { db.ref("leiloes/"+id).update({status: s}); }
+        function deleteItem(id) { if(confirm("Excluir?")) db.ref("leiloes/"+id).remove(); }
+        function limparTudo() { if(confirm("Apagar TUDO?")) db.ref("leiloes").remove(); }
+    </script>
+</body>
+</html>
+
