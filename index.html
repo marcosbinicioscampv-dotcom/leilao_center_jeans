@@ -31,7 +31,8 @@
         .admin-controls button { flex: 1; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer; font-weight: bold; font-size: 0.7rem; }
         .history-box { margin-top: 20px; border-top: 1px solid rgba(212,175,55,0.2); padding-top: 15px; }
         .history-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
-        .edit-box { background: rgba(212,175,55,0.05); padding: 10px; border-radius: 4px; margin-top: 10px; border: 1px solid rgba(212,175,55,0.2); }
+        .edit-box { background: rgba(212,175,55,0.08); padding: 12px; border-radius: 6px; margin-top: 10px; border: 1px solid rgba(212,175,55,0.3); }
+        label { display: block; font-size: 0.7rem; color: #d4af37; margin-bottom: 4px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -117,15 +118,9 @@
             const newTitle = document.getElementById(`edit_title_${id}`).value;
             const newPrice = parseFloat(document.getElementById(`edit_price_${id}`).value);
             const newImg = document.getElementById(`edit_img_${id}`).value;
-            
-            if(!newTitle || isNaN(newPrice)) return alert("Título e Preço não podem ser vazios!");
-            
-            db.ref(`leiloes/${id}`).update({
-                title: newTitle,
-                currentPrice: newPrice,
-                img: newImg
-            });
-            alert("Alterações salvas com sucesso!");
+            if(!newTitle || isNaN(newPrice)) return alert("Campos obrigatórios vazios!");
+            db.ref(`leiloes/${id}`).update({ title: newTitle, currentPrice: newPrice, img: newImg });
+            alert("Alterações salvas!");
         }
 
         function openItem(id) {
@@ -136,36 +131,31 @@
                 if(!item) return showHome();
                 document.getElementById('homeView').classList.add('hidden');
                 document.getElementById('itemView').classList.remove('hidden');
-                
                 let htmlLance = item.status === 'active' ? `
                     <div style="margin-top:15px">
                         <input id="u_nome" placeholder="Seu Nome Completo">
                         <input id="u_telefone" type="tel" placeholder="WhatsApp (ex: 66999999999)">
                         <input id="u_valor" type="number" value="${item.currentPrice + 5}">
                         <button class="btn-gold" onclick="enviarLance('${id}', ${item.currentPrice})">Confirmar Lance</button>
-                    </div>
-                ` : `<div style="text-align:center; padding:15px; color:#ff5555; border:1px solid #ff5555; border-radius:4px; margin-top:10px;">LEILÃO ENCERRADO</div>`;
-
+                    </div>` : `<div style="text-align:center; padding:15px; color:#ff5555; border:1px solid #ff5555; border-radius:4px; margin-top:10px;">ENCERRADO</div>`;
+                
                 let htmlHist = "";
                 if(item.historico) {
                     const bids = Object.values(item.historico).reverse();
-                    htmlHist = `<div class="history-box"><p class="gold" style="font-size:0.8rem; margin-bottom:10px;">ÚLTIMOS LANCES:</p>` + 
+                    htmlHist = `<div class="history-box"><p class="gold" style="font-size:0.8rem; margin-bottom:10px;">HISTÓRICO:</p>` + 
                     bids.slice(0,5).map(b => `<div class="history-item"><span>${b.nome}</span><span class="gold">R$ ${b.valor}</span></div>`).join('') + `</div>`;
                 }
-
                 document.getElementById('detalheItem').innerHTML = `
                     <div class="card">
                         <span class="status-badge bg-${item.status}">${item.status === 'active' ? 'Ao Vivo' : 'Encerrado'}</span>
                         ${renderImgs(item.img)}
                         <div style="padding: 15px;">
-                            <h2 style="font-family: 'Playfair Display'; margin-bottom: 15px;">${item.title}</h2>
-                            <div style="background:rgba(212,175,55,0.1); padding:1rem; border-radius:8px; text-align:center; margin-bottom:20px; border:1px dashed #d4af37;">
-                                <p style="font-size:0.8rem; opacity: 0.8;">VALOR ATUAL</p>
-                                <h1 class="gold" style="font-size:2.8rem; margin: 5px 0;">R$ ${item.currentPrice}</h1>
-                                <p style="font-size: 0.9rem;">Líder: <strong>${item.lastBidder}</strong></p>
+                            <h2 style="font-family: 'Playfair Display';">${item.title}</h2>
+                            <div style="background:rgba(212,175,55,0.1); padding:1rem; border-radius:8px; text-align:center; margin:15px 0; border:1px dashed #d4af37;">
+                                <h1 class="gold" style="font-size:2.5rem;">R$ ${item.currentPrice}</h1>
+                                <p style="font-size: 0.9rem;">Líder: ${item.lastBidder}</p>
                             </div>
-                            ${htmlLance}
-                            ${htmlHist}
+                            ${htmlLance}${htmlHist}
                         </div>
                     </div>`;
             });
@@ -175,14 +165,11 @@
             const nome = document.getElementById('u_nome').value.trim();
             const tel = document.getElementById('u_telefone').value.trim();
             const lance = parseFloat(document.getElementById('u_valor').value);
-
-            if(!nome) return alert("Por favor, digite seu NOME!");
-            if(!tel) return alert("Por favor, digite seu WHATSAPP!");
-            if(isNaN(lance) || lance <= precoAtual) return alert("O lance deve ser MAIOR que R$ " + precoAtual);
-            
+            if(!nome || !tel) return alert("Preencha Nome e WhatsApp!");
+            if(isNaN(lance) || lance <= precoAtual) return alert("Lance inválido!");
             db.ref(`leiloes/${id}`).update({ currentPrice: lance, lastBidder: nome, lastBidderPhone: tel });
             db.ref(`leiloes/${id}/historico`).push({ nome, valor: lance });
-            alert("Sucesso! Você é o novo líder.");
+            alert("Lance enviado!");
         }
 
         db.ref("leiloes").on("value", (snap) => {
@@ -190,32 +177,24 @@
             const listaVitrine = document.getElementById('listaLeiloes');
             const listaAdmin = document.getElementById('listaAdmin');
             listaVitrine.innerHTML = ""; listaAdmin.innerHTML = "";
-
             Object.keys(data).sort((a,b) => b-a).forEach(id => {
                 const item = data[id];
                 listaVitrine.innerHTML += `
                     <div class="card" onclick="openItem('${id}')">
                         <span class="status-badge bg-${item.status}">${item.status === 'active' ? 'Ao Vivo' : 'Breve'}</span>
                         ${renderImgs(item.img)}
-                        <div style="padding: 15px"><h3 class="gold">${item.title}</h3><p style="font-size:1.3rem; font-weight:bold;">R$ ${item.currentPrice}</p></div>
+                        <div style="padding: 15px"><h3 class="gold">${item.title}</h3><p style="font-size:1.3rem;">R$ ${item.currentPrice}</p></div>
                     </div>`;
-
-                let wa = item.lastBidderPhone ? `<a href="https://wa.me/55${item.lastBidderPhone.replace(/\D/g,'')}" target="_blank" style="color:#50c878; text-decoration:none; font-size:0.8rem;">📱 WhatsApp Cliente</a>` : 'Sem lances';
-                
+                let wa = item.lastBidderPhone ? `<a href="https://wa.me/55${item.lastBidderPhone.replace(/\D/g,'')}" target="_blank" style="color:#50c878; font-size:0.75rem;">📱 WhatsApp</a>` : 'Sem lances';
                 listaAdmin.innerHTML += `
                     <div class="card" style="padding: 10px;">
                         <div class="edit-box">
-                            <label style="font-size:0.7rem; color:#d4af37">NOME DO PRODUTO:</label>
-                            <input id="edit_title_${id}" value="${item.title}">
-                            <label style="font-size:0.7rem; color:#d4af37">PREÇO/LANCE ATUAL (R$):</label>
-                            <input id="edit_price_${id}" type="number" value="${item.currentPrice}">
-                            <label style="font-size:0.7rem; color:#d4af37">LINKS DAS FOTOS (VÍRGULA):</label>
-                            <textarea id="edit_img_${id}" rows="2">${item.img || ''}</textarea>
-                            <button class="btn-gold" style="padding:5px; font-size:0.7rem" onclick="updateLote('${id}')">SALVAR ALTERAÇÕES</button>
+                            <label>NOME:</label><input id="edit_title_${id}" value="${item.title}">
+                            <label>PREÇO ATUAL:</label><input id="edit_price_${id}" type="number" value="${item.currentPrice}">
+                            <label>LINKS FOTOS:</label><textarea id="edit_img_${id}" rows="2">${item.img || ''}</textarea>
+                            <button class="btn-gold" style="font-size:0.7rem; padding:8px;" onclick="updateLote('${id}')">SALVAR ALTERAÇÕES</button>
                         </div>
-                        <div style="margin-top:10px; font-size:0.8rem">
-                            Líder: <strong>${item.lastBidder}</strong> | ${wa}
-                        </div>
+                        <p style="font-size:0.8rem; margin:10px 0;">Líder: ${item.lastBidder} | ${wa}</p>
                         <div class="admin-controls">
                             <button onclick="setStatus('${id}','active')" style="background:#1b4d3e">ABRIR</button>
                             <button onclick="setStatus('${id}','closed')" style="background:#4d1b1b">FECHAR</button>
@@ -226,8 +205,8 @@
         });
 
         function setStatus(id, s) { db.ref("leiloes/"+id).update({status: s}); }
-        function deleteItem(id) { if(confirm("Excluir definitivamente?")) db.ref("leiloes/"+id).remove(); }
-        function limparTudo() { if(confirm("Apagar todos os lotes do banco de dados?")) db.ref("leiloes").remove(); }
+        function deleteItem(id) { if(confirm("Excluir?")) db.ref("leiloes/"+id).remove(); }
+        function limparTudo() { if(confirm("Apagar tudo?")) db.ref("leiloes").remove(); }
     </script>
 </body>
 </html>
